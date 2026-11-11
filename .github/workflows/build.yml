@@ -1,0 +1,45 @@
+name: Build
+
+on:
+  push:
+    paths:
+      - "ClaudeChat.zip"
+      - ".github/workflows/build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Scompatta lo zip
+        run: unzip -q ClaudeChat.zip
+
+      - name: Compila l'APK firmato
+        working-directory: ClaudeChat
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+        run: gradle assembleRelease --no-daemon
+
+      - name: Crea la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK=$(ls ClaudeChat/app/build/outputs/apk/release/*.apk | head -n 1)
+          cp "$APK" ClaudeChat-${{ github.run_number }}.apk
+          gh release create "v${{ github.run_number }}" "ClaudeChat-${{ github.run_number }}.apk" \
+            --title "Claude Chat 1.${{ github.run_number }}" \
+            --notes "Build automatica ${{ github.run_number }}"
